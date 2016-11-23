@@ -1,1 +1,1 @@
-# beyesy
+# bayesy
