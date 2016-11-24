@@ -1,0 +1,4 @@
+rootProject.name = 'bayesy'
+
+String[] modules = ['common', 'network', 'preprocessor']
+include modules
