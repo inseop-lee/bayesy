@@ -3,7 +3,7 @@ repositories {
 }
 
 dependencies {
-	compile project(':preprocessor')
+	compile project(':preprocessing')
     compile 'org.eclipse.recommenders:org.eclipse.recommenders.jayes:2.5.0-SNAPSHOT'
     compile 'org.eclipse.recommenders:org.eclipse.recommenders.jayes.io:2.5.0-SNAPSHOT'
     compile 'org.eclipse.recommenders:org.eclipse.recommenders.jayes.transformation:2.5.0-SNAPSHOT'

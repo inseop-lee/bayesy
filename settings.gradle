@@ -1,4 +1,4 @@
 rootProject.name = 'bayesy'
 
-String[] modules = ['common', 'network', 'preprocessor']
+String[] modules = ['common', 'network', 'preprocessing']
 include modules
