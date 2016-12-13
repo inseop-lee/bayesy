@@ -13,6 +13,7 @@ import org.eclipse.recommenders.jayes.BayesNet;
 import org.eclipse.recommenders.jayes.BayesNode;
 import org.eclipse.recommenders.jayes.inference.jtree.JunctionTreeAlgorithm;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -23,7 +24,7 @@ import io.bayesy.preprocessing.PreprocessingContext;
 /**
  * @author inseop.lee
  *
- * TODO : Evidence 별도 클래스로 분리??
+ *         TODO : Evidence 별도 클래스로 분리??
  */
 
 public class NetworkHandler {
@@ -32,39 +33,43 @@ public class NetworkHandler {
     private BayesNode targetNode;
     private List<Observable> observables;
     private PreprocessingContext preprocessingContext;
-    private Map<BayesNode, Object> evidences;
-    
+    private Map<BayesNode, String> evidences;
+
     NetworkHandler(BayesNet net, BayesNode targetNode) {
 	this.net = net;
 	this.targetNode = targetNode;
 	this.observables = Lists.newArrayList();
+	evidences = Maps.newHashMap();
 	inferer = new JunctionTreeAlgorithm();
 
 	inferer.getFactory().setFloatingPointType(float.class);
 	inferer.setNetwork(net);
     }
 
-    public HashMap<String, Double> getMarginal() {
-	return getMarginal(targetNode);
-    }
-
-    public HashMap<String, Double> getMarginalByNodeName(String nodeName) {
-	return getMarginal(net.getNode(nodeName));
-    }
-
-    public void addObservable(String nodeName) {
-	BayesNode node = net.getNode(nodeName);
-	observables.add(new DiscreteObservable(node));
-    }
-
     void setPreprocessingContext(PreprocessingContext pCtx) {
 	preprocessingContext = pCtx;
     }
-    
 
-    private HashMap<String, Double> getMarginal(BayesNode node) {
+    public HashMap<String, Double> computeProbabilities() {
+	return computeProbabilities(targetNode);
+    }
+
+    public HashMap<String, Double> computeProbabilitiesByNodeName(String nodeName) {
+	return computeProbabilities(net.getNode(nodeName));
+    }
+
+    void addObservable(String nodeName) {
+	BayesNode node = net.getNode(nodeName);
+	try {
+	    observables.add(new DiscreteObservable(Preconditions.checkNotNull(node)));
+	} catch (NullPointerException e) {
+	    throw new NullPointerException(String.format("There is no Observable in the Network. : %s", nodeName));
+	}
+    }
+
+    private HashMap<String, Double> computeProbabilities(BayesNode node) {
 	propagate();
-	
+
 	double[] marginals = inferer.getBeliefs(node);
 	HashMap<String, Double> result = new HashMap<String, Double>();
 
@@ -74,40 +79,48 @@ public class NetworkHandler {
 
 	return result;
     }
-    
+
     private void propagate() {
+
+	addAllEvidences(getEvidences());
+
 	if (!Objects.isNull(preprocessingContext)) {
 	    addAllEvidences(preprocessingContext.preprocessingData(getEvidences()));
 	}
-	
-	for(Observable observable : observables) {
+
+	for (Observable observable : observables) {
 	    try {
-		String obNodeName = observable.getNodeName();
-		observable.setValue(evidences.get(obNodeName));
-		inferer.addEvidence(observable.getNode(), observable.getConfluentState());
+		observable.setValue(Preconditions.checkNotNull(evidences.get(observable.getNode())));
+		inferer.addEvidence(observable.getNode(), observable.findConfluentState());
 	    } catch (NullPointerException e) {
-		//TODO : invalid preprocessing key 
+		throw new NullPointerException(
+			String.format("Some observable have not any evidence. : %s", observable.getNodeName()));
+	    } catch (IllegalArgumentException e) {
+		throw new IllegalArgumentException(String.format("The evidence is not matched with the node. : %s-%s",
+			observable.getNodeName(), observable.findConfluentState()));
 	    }
 	}
     }
 
-    public void addAllEvidences(Map<String, Object> map) {
-	for(String key : map.keySet()) {
-	    addEvidence(key,map.get(key));
-	}
-    }
-    
-    public void addEvidence(String key, Object value) {
-	try {
-	    evidences.put(net.getNode(key), value);
-	} catch (NullPointerException e) {
-	    //TODO : invalid evidence Key
+    public void addAllEvidences(Map<String, String> map) {
+	for (String key : map.keySet()) {
+	    addEvidence(key, map.get(key));
 	}
     }
 
-    private Map<String, Object> getEvidences() {
-	Map<String, Object> evidencesMap = Maps.newHashMap();
-	for(BayesNode node : evidences.keySet()) {
+    public void addEvidence(String nodeName, String value) {
+	try {
+	    BayesNode node = net.getNode(nodeName);
+	    Preconditions.checkNotNull(node);
+	    evidences.put(node, value);
+	} catch (NullPointerException e) {
+	    throw new NullPointerException(String.format("The node is not in the Network. : %s", nodeName));
+	}
+    }
+
+    public Map<String, String> getEvidences() {
+	Map<String, String> evidencesMap = Maps.newHashMap();
+	for (BayesNode node : evidences.keySet()) {
 	    evidencesMap.put(node.getName(), evidences.get(node));
 	}
 	return evidencesMap;
